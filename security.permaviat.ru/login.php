@@ -1,17 +1,38 @@
 <?php
 	session_start();
 	include("./settings/connect_datebase.php");
+
+	$SECRET_KEY = 'rf5UGVLwMh'; 
 	
-	if (isset($_SESSION['user'])) {
-		if($_SESSION['user'] != -1) {
-			
-			$user_query = $mysqli->query("SELECT * FROM `users` WHERE `id` = ".$_SESSION['user']);
-			while($user_read = $user_query->fetch_row()) {
-				if($user_read[3] == 0) header("Location: user.php");
-				else if($user_read[3] == 1) header("Location: admin.php");
+	if (isset($_SESSION['token']) && !empty($_SESSION['token'])) {
+		$token = $_SESSION['token'];
+		$parts = explode('.', $token);
+
+		if (count($parts) === 3) {
+			$header_base64 = $parts[0];
+			$payload = $parts[1];
+			$signatureJWT = $parts[2];
+
+			$header = json_decode(base64_decode($header_base64));
+			$unsignedToken = $header_base64 . '.' . $payload;
+			$signature = base64_encode(hash_hmac($header->alg, $unsignedToken, $SECRET_KEY));
+
+			if ($signatureJWT === $signature) {
+				$payload_data = json_decode(base64_decode($payload), true);
+				$user_id = $payload_data['userId'];
+				$role = $payload_data['role'];
+
+				if ($role == 0) {
+					header("Location: user.php");
+				} else if ($role == 1) {
+					header("Location: admin.php");
+				}
+				exit();
+			} else {
+				unset($_SESSION['token']); 
 			}
 		}
- 	}
+	}
 ?>
 <html>
 	<head> 
@@ -55,9 +76,8 @@
 				</div>
 			</div>
 		</div>
-		
 		<script>
-			function LogIn() {
+		function LogIn() {
 				var loading = document.getElementsByClassName("loading")[0];
 				var button = document.getElementsByClassName("button")[0];
 				
@@ -70,40 +90,31 @@
 				data.append("login", _login);
 				data.append("password", _password);
 				
-				// AJAX запрос
 				$.ajax({
-					url         : 'ajax/login_user.php',
-					type        : 'POST', // важно!
-					data        : data,
-					cache       : false,
-					dataType    : 'html',
-					// отключаем обработку передаваемых данных, пусть передаются как есть
-					processData : false,
-					// отключаем установку заголовка типа запроса. Так jQuery скажет серверу что это строковой запрос
-					contentType : false, 
-					// функция успешного ответа сервера
+					url: 'ajax/login_user.php',
+					type: 'POST',
+					data: data,
+					cache: false,
+					dataType: 'json',
+					processData: false,
+					contentType: false,
 					success: function (_data) {
-						console.log("Авторизация прошла успешно, id: " +_data);
-						if(_data == "") {
-							loading.style.display = "none";
-							button.className = "button";
-							alert("Логин или пароль не верный.");
-						} else {
-							localStorage.setItem("token", _data);
+						if (_data.token) {
+							localStorage.setItem("token", _data.token);
 							location.reload();
+						} else {
+							alert(_data.error || "Ошибка авторизации");
 							loading.style.display = "none";
 							button.className = "button";
 						}
 					},
-					// функция ошибки
-					error: function( ){
+					error: function() {
 						console.log('Системная ошибка!');
 						loading.style.display = "none";
 						button.className = "button";
 					}
 				});
 			}
-			
 			function PressToEnter(e) {
 				if (e.keyCode == 13) {
 					var _login = document.getElementsByName("_login")[0].value;
@@ -116,7 +127,6 @@
 					}
 				}
 			}
-			
 		</script>
 	</body>
 </html>
