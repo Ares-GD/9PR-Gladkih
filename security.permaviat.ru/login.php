@@ -2,10 +2,15 @@
 	session_start();
 	include("./settings/connect_datebase.php");
 
-	$SECRET_KEY = 'rf5UGVLwMh'; 
+	$SECRET_KEY = 'cAtwa1kkEy'; 
 	
+	if (isset(apache_request_headers()['token'])) {
+		$_SESSION['token'] = apache_request_headers()['token'];
+	}
+
 	if (isset($_SESSION['token']) && !empty($_SESSION['token'])) {
 		$token = $_SESSION['token'];
+		file_put_contents('log.txt', "$token");
 		$parts = explode('.', $token);
 
 		if (count($parts) === 3) {
@@ -29,7 +34,7 @@
 				}
 				exit();
 			} else {
-				unset($_SESSION['token']); 
+				unset($_SESSION['token']); // Если подпись неверна, удаляем токен
 			}
 		}
 	}
@@ -76,6 +81,7 @@
 				</div>
 			</div>
 		</div>
+		
 		<script>
 		function LogIn() {
 				var loading = document.getElementsByClassName("loading")[0];
@@ -101,7 +107,7 @@
 					success: function (_data) {
 						if (_data.token) {
 							localStorage.setItem("token", _data.token);
-							location.reload();
+							location.href= "user.php"; 
 						} else {
 							alert(_data.error || "Ошибка авторизации");
 							loading.style.display = "none";
@@ -115,6 +121,7 @@
 					}
 				});
 			}
+			
 			function PressToEnter(e) {
 				if (e.keyCode == 13) {
 					var _login = document.getElementsByName("_login")[0].value;
@@ -127,6 +134,7 @@
 					}
 				}
 			}
+			
 		</script>
 	</body>
 </html>
