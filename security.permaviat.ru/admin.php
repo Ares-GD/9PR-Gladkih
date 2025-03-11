@@ -1,18 +1,45 @@
 <?php
-	session_start();
-	include("./settings/connect_datebase.php");
-	
-	if (isset($_SESSION['user'])) {
-		if($_SESSION['user'] != -1) {
-			$user_query = $mysqli->query("SELECT * FROM `users` WHERE `id` = ".$_SESSION['user']); // проверяем
-			while($user_read = $user_query->fetch_row()) {
-				if($user_read[3] == 0) header("Location: index.php");
-			}
-		} else header("Location: login.php");
- 	} else {
-		header("Location: login.php");
-		echo "Пользователя не существует";
-	}
+session_start();
+
+if (!isset($_SESSION['token']) || empty($_SESSION['token'])) {
+    header("Location: login.php");
+    exit();
+}
+include("./settings/connect_datebase.php");
+
+$SECRET_KEY = 'cAtwa1kkEy';
+$token = $_SESSION['token'];
+$parts = explode('.', $token);
+
+if (count($parts) === 3) {
+    $header_base64 = $parts[0];
+    $payload_base64 = $parts[1];
+    $signatureJWT = $parts[2];
+
+    $unsignedToken = $header_base64 . '.' . $payload_base64;
+    $signature = base64_encode(hash_hmac('sha256', $unsignedToken, $SECRET_KEY, true));
+
+    if ($signatureJWT === $signature) {
+        $payload_data = json_decode(base64_decode($payload_base64), true);
+        $_SESSION['user_id'] = $payload_data['userId'];
+        $role = $payload_data['role'];
+
+        file_put_contents('debug_log.txt', "Зашли в user.php. Роль пользователя: $role\n", FILE_APPEND);
+
+        if ($role == 0) {
+            header("Location: user.php");
+            exit();
+        }
+    } else {
+        unset($_SESSION['token']);
+        header("Location: login.php");
+        exit();
+    }
+} else {
+    unset($_SESSION['token']);
+    header("Location: login.php");
+    exit();
+}
 ?>
 <!DOCTYPE HTML>
 <html>
